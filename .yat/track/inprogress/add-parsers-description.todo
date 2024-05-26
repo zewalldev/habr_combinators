@@ -1,5 +1,6 @@
 @title: Описание типа Parser и элементарных парсеров
 @author: Denis Shirokov <zewalldev@yandex.ru>
+@implementer: Denis Shirokov <zewalldev@yandex.ru>
 @description
 План
  - Описание типа, описание результата, функция `map` для результата 
