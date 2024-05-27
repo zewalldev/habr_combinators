@@ -2,9 +2,9 @@
 @author: Denis Shirokov <zewalldev@yandex.ru>
 @description
 Пдан
- - Комбинатор `Mapper`
  - Комбинатор `Seq`
- - Комбинатор `Alt`
+ - Комбинатор `Alt` и добавление парсера `Return`
+ - Комбинатор `Mapper`
  - Функция `optional`
  - Функции `manyOf` и `someOf`, выраженные через комбинаторы(отметить что это не очень хорошая идея)
  - Вспомогательные функции `seq` и `alt`

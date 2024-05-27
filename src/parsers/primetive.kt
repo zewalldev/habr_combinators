@@ -2,12 +2,11 @@ package parsers
 
 sealed interface ParseResult<out A> {
     data class Fail(val msg: String) : ParseResult<Nothing>
-    data class Success<A>(val tail: String, val result: A) : ParseResult<A>
+    data class Success<A>(val tail: String, val pos: Int, val result: A) : ParseResult<A>
 }
 
 interface Parser<A> {
     fun parse(str: String): ParseResult<A>
-    fun <R> accept(visitor: Visitor<R>): R
 }
 
 fun <T, R> ParseResult<T>.map(block: (ParseResult.Success<T>) -> ParseResult<R>) = when (this) {
@@ -15,12 +14,17 @@ fun <T, R> ParseResult<T>.map(block: (ParseResult.Success<T>) -> ParseResult<R>)
     is ParseResult.Success -> block(this)
 }
 
-open class TakeIf(private val predicate: (Char) -> Boolean) : Parser<Char> {
-    override fun parse(str: String) = if (str.isNotEmpty() && predicate(str.first())) {
-        ParseResult.Success(str.drop(1), str.first())
-    } else {
-        ParseResult.Fail(str, "The symbol ${str.firstOrNull()} does not satisfy predicate.")
+class TakeIf(private val description: String, private val predicate: (Char) -> Boolean) : Parser<Char> {
+    override fun parse(str: String) = when {
+        str.isEmpty() -> ParseResult.Fail("Input string is empty")
+        !predicate(str.first()) -> ParseResult.Fail("Symbol '${str.first()}' does not satisfy predicate: $description")
+        else -> ParseResult.Success(str.drop(1), 1, str.first())
     }
+}
 
-    override fun <R> accept(visitor: Visitor<R>) = visitor.visitParser(this)
+fun symbol(c: Char) = TakeIf("equals $c") { it == c }
+
+fun main() {
+    println(symbol('a').parse("abc")) // output: Success(tail=bc, pos=1, result=a)
+    println(symbol('b').parse("abc")) // output: Fail(msg=Symbol 'a' does not satisfy predicate: equals b)
 }
