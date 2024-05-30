@@ -1,5 +1,6 @@
 @title: Разбор арифметических выражений
 @author: Denis Shirokov <zewalldev@yandex.ru>
+@implementer: Denis Shirokov <zewalldev@yandex.ru>
 @description
 План
  - Грамматика
