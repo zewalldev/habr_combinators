@@ -1,11 +1,12 @@
 @title: Добавить описание комбинаторов
 @author: Denis Shirokov <zewalldev@yandex.ru>
+@implementer: Denis Shirokov <zewalldev@yandex.ru>
 @description
 Пдан
  - Комбинатор `Seq`
- - Комбинатор `Alt` и добавление парсера `Return`
+ - Комбинатор `Alt`
  - Комбинатор `Mapper`
- - Функция `optional`
+ - Функция `optional` и добавление парсера `Return`
  - Функции `manyOf` и `someOf`, выраженные через комбинаторы(отметить что это не очень хорошая идея)
  - Вспомогательные функции `seq` и `alt`
  - Функция `ref` для рекурсивного вызова

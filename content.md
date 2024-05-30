@@ -13,7 +13,7 @@
 А также увидим примеры применения комбинаторов не только для написания парсеров.
 Код используемый в статье доступен в [репозитории]().
 
-### Вспомним несколько понятий из теории формальных языков. ### 
+### Вспомним несколько понятий из теории формальных языков.
 **Формальный язык** это множество слов над конечным множеством символов - алфавитом. 
 Для того что бы выделить из всего множества слов некоторое его подмножество используют **формальные грамматики**.
 Грамматику можно задать набором правил вида: `L -> R`, где `L` - непустая последовательность терминалов и нетерминалов, содержащая хотя бы один нетерминал, 
@@ -43,7 +43,7 @@ S -> &epsi;
 Для того что бы разобрать КС-грамматику достаточно автомата с магазинной памятью(МП-автомат),
 а вот для разбора КЗ-грамматики потребуется линейно-ограниченный автомат, более можщный формализм с точки зрения вычислимости по сравнению с МП-автоматом. 
 
-### Комбинаторы синтаксичсеского анализа ###
+### Комбинаторы синтаксичсеского анализа
 
 Парсер комбинаторы занимают уникальное место в области синтаксичсеского анализа, они позволяют писать выражения, 
 повторяющие струкутру грамматических правил, то есть задают удобный DSL для написания парсеров. 
@@ -56,21 +56,21 @@ S -> &epsi;
 применит к строке сначала парсер `p1` и если разбор завершится с ошибкой, то применит `p2`. Или комбинатор следования `Seq(p1, p2)`, прменяющий последовательно `p1` и `p2`.
 
 ## Tип `Parser` и элементарные синтаксические анализаторы.
-### `Parser` и `ParseResult` ###
+
+### `Parser` и `ParseResult`
 Начнем с определения интерфейса `Parser` и результата работы парсера `ParseResult`.
 
 Запечатанный интерфейс `ParseResult<out A>` представляет успешный или неуспешный результат разбора.
 ```kotlin
 sealed interface ParseResult<out A> {
     data class Fail(val msg: String) : ParseResult<Nothing>
-    data class Success<A>(val tail: String, val pos: Int, val result: A) : ParseResult<A>
+    data class Success<A>(val tail: String, val result: A) : ParseResult<A>
 }
 ```
 Обратите внимание как мы используем `Nothing` для класса `Fail` - это возможно, потому что `Nothing` является наследником любого класса в Kotlin. 
 
 В классе `Fail` аттрибут `msg` это сообщение об ошибке, а в классе `Success` аттрибуты:
  - `tail` - оставшаяся часть строки, которую еще нужно разобрать;
- - `pos` - позиция, указывающая на ту часть строки, которые мы уже разобрали, мы будем использовать эту информацию, для того что бы указать позицию с которой парсер не смог разобрать строку;
  - `result` - результат работы парсера, это может что угодно, например символ типа `Char` или синтаксическое дерево разбора.  
 
 Интерфейс парсера определяется просто:
@@ -89,15 +89,15 @@ fun <T, R> ParseResult<T>.map(block: (ParseResult.Success<T>) -> ParseResult<R>)
 }
 ```
 
-### Парсер `TakeIf` ###
+### Парсер `TakeIf`
 
-Теперь все готово что бы написать наш первый парсер, назовем его `TakeIf`. Он будет проверять - соответствует ли первый символ строки заданному предикату.
+Теперь все готово что бы написать наш первый парсер `TakeIf`. Он будет проверять - соответствует ли первый символ строки заданному предикату.
 ```kotlin
 class TakeIf(private val description: String, private val predicate: (Char) -> Boolean) : Parser<Char> {
     override fun parse(str: String) = when {
         str.isEmpty() -> ParseResult.Fail("Input string is empty")
         !predicate(str.first()) -> ParseResult.Fail("Symbol '${str.first()}' does not satisfy predicate: $description")
-        else -> ParseResult.Success(str.drop(1), 1, str.first())
+        else -> ParseResult.Success(str.drop(1), str.first())
     }
 }
 ```
@@ -113,13 +113,155 @@ println(symbol('a').parse("abc")) // output: Success(tail=bc, pos=1, result=a)
 println(symbol('b').parse("abc")) // output: Fail(msg=Symbol 'a' does not satisfy predicate: equals b)
 ```
 
+### Парсер `Return`
+
+Парсер `Return` всегда возращает заданное занчение и он пригодится нам в будущем:
+```kotlin
+class Return<A>(private val a: A) : Parser<A> {
+    override fun parse(str: String) = ParseResult.Success(str, 0, a)
+}
+```
+
 Можно расширять набор элементарных парсеров и дальше вводя к примеру такие как `number(n)`, `string(str)` и так далее. 
-Мы не будем этого делать, так как они нам не понадобятся. Вообще говоря, достаточно только одного элементарного парсера `symbol(c)` для всех задач.
+Мы не будем этого делать, так как они нам не понадобятся.
 Имея такие простые парсеры можно конструировтаь анализаторы терминальных символов, но как мы видели в правилах грамматики присутствуют и нетерминалы и комбинации терминалов и нетерминалов.
 Для построения более мощных анализаторов потребуются комбинаторы.
 
+## Комбинаторы 
 
+### Alt и Seq 
 
+Вспомним, каким образом задаются правила грамматики, например для правильной скобочной последовательности:
+<pre>
+S -> (S)S
+S -> &epsi;
+</pre>
+Глядя на эти правила становится ясно, что потребуются комбинаторы следования `Seq` и альтернативы `Alt`.
+`Seq` это комбинатор типа `Parser<Pair<A, B>>`, который принимает на вход два парсера `pa: Parser<A>`, `pb: Parser<B>` и применяет их последовательно, возвращаея `Pair<A, B>`:
+```kotlin
+class Seq<A, B>(private val pa: Parser<A>, private val pb: Parser<B>) : Parser<Pair<A, B>> {
+    override fun parse(str: String) = pa.parse(str).map { it1 ->
+        pb.parse(it1.tail).map { it2 ->
+            ParseResult.Success(it2.tail, it1.result to it2.result)
+        }
+    }
+}
+```
+Комбинатор `Alt` на основе парсеров `p1, p2: Parser<A>` конструирует парсер, возвращающий результат применения `p1`, а если он вернет `Fail`, то результат применения `p2`:
+```kotlin
+class Alt<A>(private val p1: Parser<A>, private val p2: Parser<A>) : Parser<A> {
+    override fun parse(str: String) = when (val r = p1.parse(str)) {
+        is ParseResult.Fail -> p2.parse(str)
+        is ParseResult.Success -> r
+    }
+}
+```
+
+### Преобразователь парсеров `Mapper` и "ленивость"
+
+Если бы мы сейчас решили реализовать парсер для разбора правильной скобочной последовательности, то написали бы такой код:
+```kotlin
+val `(` = symbol('(')
+val `)` = symbol(')')
+
+fun parens() : Parser<???> = Alt(
+    Seq(`(`, Seq(parens(), Seq(`)`, parens()))),
+    Return(Unit)
+)
+
+fun main() {
+    parens().parse("(()())")
+}
+```
+Это нерабочей код, в нем есть две проблемы. Первая это невозможность вычислить тип парсера, возвращаемый функцией `parens()`, 
+а вторая - это это рекурсивный вызов функции самой себя. Со второй проблемой легко справиться, добавив "ленивости" нашим парсерам:
+```kotlin
+fun <A> ref(lazy: () -> Parser<A>) = object : Parser<A> {
+    override fun parse(str: String) = lazy().parse(str)
+}
+```
+Для того что бы решить первую проблему, нужно ввести преобразователь типа парсера, который позволит из `Parser<A>` получить `Parser<B>`:
+```kotlin
+class Mapper<A, B>(private val p: Parser<A>, private val f: (A) -> B) : Parser<B> {
+    override fun parse(str: String) = p.parse(str).map { ParseResult.Success(it.tail, f(it.result)) }
+}
+```
+Теперь мы можем написать рабочий код, который превращает правильную скобочную последовательность в дерево разбора:
+```kotlin
+val `(` = symbol('(')
+val `)` = symbol(')')
+
+fun parens(): Parser<Tree> = Alt(
+    Mapper(
+        Seq(
+            `(`,
+            Seq(
+                ref { parens() },
+                Seq(
+                    `)`,
+                    ref { parens() }
+                )
+            )
+        )
+    ) { (_, a) -> Tree.Node(a.first, a.second.second) },
+    Return(Tree.Leaf)
+)
+
+fun main() {
+    println(parens().parse("(()())")) //output: Success(tail=, pos=6, result=Node(left=Node(left=Leaf, right=Node(left=Leaf, right=Leaf)), right=Leaf))
+}
+```
+Подведем промежуточный итог. 
+Мы реализовали пару элементарных парсеров `TakeIf` и `Return<A>`, преобразователь `Mapper<A, B>` и пару комбинаторов `Alt<A>`, `Seq<A, B>`.
+С таким набором инструметов можно разбирать КС-грамматики, но стоит признать, что код таким образом писать не удобно.
+Введем несколько вспомогательных функций.
+
+### Вспомогательные функции `alt`, `seq`, `optional`, `manyOf` и `someOf`
+
+Функция `alt(p: Parser<A>, vararg ps: Parser<A>)` будет принимать на вход набор парсеров, и возвращать комбинатор, который применяет эти парсеры к строке пока результат не будет `Success`.
+Реализуем ее с помощью свертки(`fold`)
+```kotlin
+fun <A> alt(p: Parser<A>, vararg ps: Parser<A>): Parser<A> = ps.fold(p) { x, xs -> Alt(x, xs) }
+```
+Функция `seq` будет также как и `alt` принимать на вход набор парсеров и последним аргументов функцию преобразования, например, в случае для трех парсеров ее сигнатура будет иметь вид:
+```kotlin
+seq(p1: Parser<X1>, p2: Parser<X2>, p3: Parser<X3>, f: (X1, X2, X3) -> Y): Parser<Y>
+```
+Для `seq` не получится сделать универсального решения, так как тип `f` зависит от типов предыдущих аргументов.
+Нам потребуется функция, которые преобразуют тип вида `(X1, X2, X3, X4) -> Y` в тип `(Pair<X1, Pair<X2, Pair<X3, X4>>>) -> Y`.
+Приведу пример для трех аргументов, а более подробно с кодом можно познакомиться в [репозетории]():
+```kotlin
+fun <X1, X2, X3, X4, Y> args2tuple(f: (X1, X2, X3, X4) -> Y): (Pair<X1, Pair<X2, Pair<X3, X4>>>) -> Y =
+    args2tuple { x1, x2, (x3, x4) -> f(x1, x2, x3, x4) }
+
+fun <X1, X2, X3, Y> seq(p1: Parser<X1>, p2: Parser<X2>, p3: Parser<X3>, f: (X1, X2, X3) -> Y) =
+    Mapper(Seq(p1, Seq(p2, p3)), args2tuple(f))
+```
+Так же нам будут полезны комбинаторы:
+- `optional(p: Parser<A>, a: A): Parser<A>` - применяет парcер `p` и в случае неудачи возвращает значение `a`;
+- `someOf(p: Parser<A>): Parser<List<A>>` - ожидает что `p` вернет `Success` хотя бы один раз;
+- `manyOf(p: Parser<A>): Parser<List<A>>` - пытается применить парсер `p` столько раз, сколько получиться, если не получилось ни разу, то вернет пустой список.
+
+Их реализация:
+```kotlin
+fun <A> optional(p: Parser<A>, a: A) = alt(p, Return(a))
+
+fun <A> someOf(p: Parser<A>): Parser<List<A>> = seq(p, ref { manyOf(p) }) { x, xs -> listOf(x) + xs }
+
+fun <A> manyOf(p: Parser<A>): Parser<List<A>> = optional(someOf(p), emptyList())
+```
+Используя вспомогательные функции, определенные выше парсер `parens()` можно переписать в более удобном виде:
+```kotlin
+fun parens2(): Parser<Tree> = optional(
+    seq(`(`, ref { parens2() }, `)`, ref { parens2() }) { _, left, _, right -> Tree.Node(left, right) },
+    Tree.Leaf
+)
+
+fun main() {
+    println(parens2().parse("(()())")) // output: Success(tail=, result=Node(left=Node(left=Leaf, right=Node(left=Leaf, right=Leaf)), right=Leaf))
+}
+```
+Теперь мы готовы приступить к написанию синтаксического анализатора арифметических выражений. 
 
 
 
