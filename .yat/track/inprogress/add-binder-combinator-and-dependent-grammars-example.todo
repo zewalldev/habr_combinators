@@ -1,5 +1,6 @@
 @title: Комбинатор связывания и анализ КЗ-грамматики 
 @author: Denis Shirokov <zewalldev@yandex.ru>
+@implementer: Denis Shirokov <zewalldev@yandex.ru>
 @description
 План
  - Введение кобиннатора следования и функции `then`
