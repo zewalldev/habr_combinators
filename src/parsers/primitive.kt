@@ -22,7 +22,12 @@ class TakeIf(private val description: String, private val predicate: (Char) -> B
     }
 }
 
-fun symbol(c: Char) = TakeIf("equals '$c'") { it == c }
+fun string(str: String): Parser<String> =
+    if (str.isNotEmpty()) seq(symbol(str.first()), string(str.drop(1))) { c, cs -> c + cs } else Return("")
+
+fun symbol(c: Char, vararg cs: Char) = TakeIf("equals '$c' and ${cs.joinToString { it.toString() }}") { it == c || c in cs }
+
+fun notSymbol(c: Char, vararg cs: Char) =  TakeIf("not equals '$c and ${cs.joinToString { it.toString() }}'") { it != c && it !in cs }
 
 class Return<A>(private val a: A) : Parser<A> {
     override fun parse(str: String) = ParseResult.Success(str, a)

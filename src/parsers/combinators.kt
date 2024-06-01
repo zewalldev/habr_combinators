@@ -23,6 +23,12 @@ class Mapper<A, B>(private val p: Parser<A>, private val f: (A) -> B) : Parser<B
     override fun parse(str: String) = p.parse(str).map { ParseResult.Success(it.tail, f(it.result)) }
 }
 
+class Binder<A, B>(private val pa: Parser<A>, private val bind: (A) -> Parser<B>) : Parser<B> {
+    override fun parse(str: String) = pa.parse(str).map {
+        bind(it.result).parse(it.tail)
+    }
+}
+
 interface Tree {
     data object Leaf : Tree
     data class Node(val left: Tree, val right: Tree) : Tree
