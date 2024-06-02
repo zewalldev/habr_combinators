@@ -1,7 +1,8 @@
 package parsers
 
-fun <A> alt(p: Parser<A>, vararg ps: Parser<A>): Parser<A> = ps.fold(p) { x, xs -> Alt(x, xs) }
-
+/**
+ * Набор функций, преобразующий функции вида (X1, X2, ...) -> Y в функции вида Pair<X1, Pair<X2, ...>> -> Y.
+ */
 fun <X1, X2, Y> args2tuple(f: (X1, X2) -> Y): (Pair<X1, X2>) -> Y =
     { (x1, x2) -> f(x1, x2) }
 
@@ -14,6 +15,9 @@ fun <X1, X2, X3, X4, Y> args2tuple(f: (X1, X2, X3, X4) -> Y): (Pair<X1, Pair<X2,
 fun <X1, X2, X3, X4, X5, Y> args2tuple(f: (X1, X2, X3, X4, X5) -> Y): (Pair<X1, Pair<X2, Pair<X3, Pair<X4, X5>>>>) -> Y =
     args2tuple { x1, x2, x3, (x4, x5) -> f(x1, x2, x3, x4, x5) }
 
+/**
+ * Набор вспомогательных функций для конструирования комбинатора следования.
+ */
 fun <X1, Y> seq(p1: Parser<X1>, f: (X1) -> Y) =
     Mapper(p1, f)
 
@@ -35,82 +39,36 @@ fun <X1, X2, X3, X4, X5, Y> seq(
     f: (X1, X2, X3, X4, X5) -> Y
 ) = Mapper(Seq(p1, Seq(p2, Seq(p3, Seq(p4, p5)))), args2tuple(f))
 
-fun <A> optional(p: Parser<A>, a: A) = alt(p, Return(a))
-
-fun <A> someOf(p: Parser<A>): Parser<List<A>> = seq(p, ref { manyOf(p) }) { x, xs -> listOf(x) + xs }
-
-fun <A> manyOf(p: Parser<A>): Parser<List<A>> = optional(someOf(p), emptyList())
-
-fun <A> take(p: Parser<A>, count: Int): Parser<List<A>> =
-    if (count == 0) Return(listOf()) else seq(p, take(p, count - 1)) { x, xs -> listOf(x) + xs }
-
-
-fun <A, B> Parser<A>.then(bind: (A) -> Parser<B>): Parser<B> = Binder(this, bind)
+/**
+ * Добавляет парсеру "ленивости".
+ */
+fun <A> ref(lazy: () -> Parser<A>) = object : Parser<A> {
+    override fun parse(str: String) = lazy().parse(str)
+}
 
 /**
- * Парсер, разбирающий грамматику:
- * S -> (S)S | &epsi;
- *
- * @return Дерево разбора
+ * Конструирует комбинатор альтернативы.
  */
-fun parens2(): Parser<Tree> = optional(
-    seq(`(`, ref { parens2() }, `)`, ref { parens2() }) { _, left, _, right -> Tree.Node(left, right) },
-    Tree.Leaf
-)
+fun <A> alt(p: Parser<A>, vararg ps: Parser<A>): Parser<A> = ps.fold(p) { x, xs -> Alt(x, xs) }
 
+/**
+ * Конструирует парсер, который вернет либо результат работы p либо значение по умолчанию a.
+ */
+fun <A> optional(p: Parser<A>, a: A) = alt(p, Return(a))
 
-enum class Spec { STR, NUM }
+/**
+ * Конструирует парсер, который проверяет, что строка удовлетворяет парсеру p хотя бы один раз.
+ * Возвращает результат применения p в виде списка.
+ */
+fun <A> someOf(p: Parser<A>): Parser<List<A>> = seq(p, ref { manyOf(p) }) { x, xs -> listOf(x) + xs }
 
-fun quote() = symbol('"')
-fun comma() = symbol(',')
+/**
+ * Конструирует парсер, который вернет пустой список, если строка не удовлетворяет парсеру p хотя бы один раз.
+ * Возвращает результат применения p в виде списка.
+ */
+fun <A> manyOf(p: Parser<A>): Parser<List<A>> = optional(someOf(p), emptyList())
 
-fun strSpec(): Parser<Spec> = seq(symbol('%'), symbol('s')) { _, _ -> Spec.STR }
-fun intSpec(): Parser<Spec> = seq(symbol('%'), symbol('f')) { _, _ -> Spec.NUM }
-
-fun spec() = alt(strSpec(), intSpec())
-
-fun frmStr(): Parser<List<Spec>> =
-    alt(
-        seq(
-            manyOf(notSymbol('%')),
-            spec(),
-            ref { frmStr() }
-        ) { _, spec, specs -> listOf(spec) + specs },
-        seq(
-            manyOf(notSymbol('%', '"'))
-        ) { _ -> listOf() }
-    )
-
-fun quotedFrmStr(): Parser<List<Spec>> =
-    seq(
-        quote(),
-        frmStr(),
-        quote()
-    ) { _, specs, _ -> specs }
-
-
-fun strType() = seq(symbol('"'), manyOf(notSymbol('"')), symbol('"')) { _, _, _ -> }
-fun numType() = seq(exp()) { _ -> }
-
-fun printf(): Parser<Unit> = seq(
-    string("printf"),
-    `(`,
-    quotedFrmStr().then {
-        it.map { spec ->
-            when (spec) {
-                Spec.STR -> seq(comma(), strType()) { _, _ -> }
-                Spec.NUM -> seq(comma(), numType()) { _, _ -> }
-            }
-        }.fold(Return(Unit) as Parser<Unit>) { types, type ->
-            seq(types, type) { _, _ -> }
-        }
-    },
-    `)`
-) { _, _, _, _ -> }
-
-
-fun main() {
-    println(parens2().parse("(()())")) // output: Success(tail=, result=Node(left=Node(left=Leaf, right=Node(left=Leaf, right=Leaf)), right=Leaf))
-    println(printf().parse("printf(\"%s = %f\",\"2 + 2\",2+2)")) // output: Success(tail=, result=kotlin.Unit)
-    println(printf().parse("printf(\"%f = %s\",\"2 + 2\",5)")) // output:  Fail(...)
-}
+/**
+ * Конструирует комбинатор связывания.
+ */
+fun <A, B> Parser<A>.then(bind: (A) -> Parser<B>): Parser<B> = Binder(this, bind)

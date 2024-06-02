@@ -1,5 +1,6 @@
 @title: Привести код в порядок
 @author: Denis Shirokov <zewalldev@yandex.ru>
+@implementer: Denis Shirokov <zewalldev@yandex.ru>
 @description
 Сделать файл main.kt и перенести примеру в него
 @end
