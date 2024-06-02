@@ -1,5 +1,6 @@
 @title: Прочитать статью второй раз 
 @author: Denis Shirokov <zewalldev@yandex.ru>
+@implementer: Denis Shirokov <zewalldev@yandex.ru>
 @description
 Прочитать второй раз:
  - запушить статью в репо
