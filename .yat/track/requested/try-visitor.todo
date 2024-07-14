@@ -1,0 +1,5 @@
+@title: Исследовать возможность обхода парсеров
+@author: Denis Shirokov <zewalldev@yandex.ru>
+@description
+Исследовать возможность обхода парсеров через шаблон Visitor.
+@end
